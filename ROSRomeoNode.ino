@@ -13,20 +13,35 @@
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
 
-const int ONBOARD_SWITCH_PIN = A7;
-const int ONBOARD_LED_PIN = 13;
+//const int ONBOARD_SWITCH_PIN = A7;  // this may cause problems TODO:
+// const int ONBOARD_LED_PIN = 13;
 
 // The pins for motor control on the Romeo BLE.
-const int M1_DIRECTION = 4;
-const int M1_SPEED = 5;
-const int M2_SPEED = 6;
-const int M2_DIRECTION = 7;
+//const int M1_DIRECTION = 4;
+//const int M1_SPEED = 5;
+//const int M2_SPEED = 6;
+//const int M2_DIRECTION = 7;
 
 // Pins for the Pololu motor encoder outputs.
-const int M1_A = 2;
-const int M1_B = 8;
-const int M2_A = 3;
-const int M2_B = 9;
+//const int M1_A = 2;
+//const int M1_B = 8;
+//const int M2_A = 3;
+//const int M2_B = 9;
+
+// Pin definitions for A-star (PR version)
+const int ONBOARD_LED_PIN = 13;
+
+const int M1_DIRECTION = 12;
+const int M1_SPEED = 9;
+const int M2_SPEED = 10;
+const int M2_DIRECTION = PE2;
+
+// Pins for the Pololu motor encoder outputs.
+const int M1_A = 0;
+const int M1_B = 4;
+const int M2_A = 1;
+const int M2_B = 8;
+
 
 ros::NodeHandle  nh;
 
@@ -52,8 +67,8 @@ ros::Subscriber<std_msgs::Float32> rwheelTargetSub("rwheel_vtarget", &rwheelTarg
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 // Ku and Tu were determined by setting Ki and Kd to zero, then increasing
 // Kp until steady oscillation occurs. Tu is the oscillation wavelength.
-const float Ku = .19;
-const float Tu = .23;
+const float Ku = .17;
+const float Tu = .14;
 const float Kp = 0.45*Ku;
 const float Ki = 1.2*Kp/Ku;
 const float Kd = Kp*Tu/8;
