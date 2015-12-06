@@ -13,7 +13,6 @@
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
 
-//const int ONBOARD_SWITCH_PIN = A7;  // this may cause problems TODO:
 // const int ONBOARD_LED_PIN = 13;
 
 // The pins for motor control on the Romeo BLE.
@@ -34,14 +33,17 @@ const int ONBOARD_LED_PIN = 13;
 const int M1_DIRECTION = 12;
 const int M1_SPEED = 9;
 const int M2_SPEED = 10;
-const int M2_DIRECTION = PE2;
+//const int M2_DIRECTION = PE2;
+//
+// workaround for broken PE2 connection on my A-star
+// this pin jumpered to PE2 trace
+const int M2_DIRECTION = 23;  
 
 // Pins for the Pololu motor encoder outputs.
 const int M1_A = 0;
 const int M1_B = 4;
 const int M2_A = 1;
 const int M2_B = 8;
-
 
 ros::NodeHandle  nh;
 
@@ -67,11 +69,24 @@ ros::Subscriber<std_msgs::Float32> rwheelTargetSub("rwheel_vtarget", &rwheelTarg
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 // Ku and Tu were determined by setting Ki and Kd to zero, then increasing
 // Kp until steady oscillation occurs. Tu is the oscillation wavelength.
-const float Ku = .17;
-const float Tu = .14;
-const float Kp = 0.45*Ku;
-const float Ki = 1.2*Kp/Ku;
-const float Kd = Kp*Tu/8;
+//
+// actually formulas at that link are:
+//  PID:  Kp= 0.6*Ku; Ki= 2*Kp/Tu; Kd= Kp*Tu/8;  
+//  PI:  Kp= 0.45*Ku; Ki= 1.2*Kp/Tu; 
+//  and these were correct in RomeoPIDTest.ino
+//
+//const float Ku = .17;
+//const float Tu = .14;
+//const float Kp = 0.45*Ku;
+//const float Ki = 1.2*Kp/Ku;
+//const float Kp = 0.6*Ku;
+//const float Ki = 2*Kp/Tu;
+//const float Kd = Kp*Tu/8;
+//
+// try M Rose new PID params
+const float Kp = 0.048;
+const float Ki = 0.279;
+const float Kd = 0.00323;
 
 SimplePID leftController = SimplePID(Kp, Ki, Kd);
 SimplePID rightController = SimplePID(Kp, Ki, Kd);
@@ -103,13 +118,20 @@ int leftMotorCmd = 0;
 int rightMotorCmd = 0;
 
 // Minimum motor control value. Motor output below this will stall.
-const int MIN_MOTOR_CMD = 60;
+const int MIN_MOTOR_CMD = 0;  // was 60
 
 void setup()
 {
   pinMode(ONBOARD_LED_PIN, OUTPUT);
   pinMode(M1_DIRECTION, OUTPUT);
   pinMode(M2_DIRECTION, OUTPUT);
+  
+  pinMode(M1_SPEED, OUTPUT);  // perhaps not needed?
+  pinMode(M2_SPEED, OUTPUT);
+  pinMode(M1_A, INPUT);
+  pinMode(M1_B, INPUT);
+  pinMode(M2_A, INPUT);
+  pinMode(M2_B, INPUT);
 
   attachInterrupt(digitalPinToInterrupt(M1_A), leftAChange, CHANGE);
   attachInterrupt(digitalPinToInterrupt(M2_A), rightAChange, CHANGE);
@@ -136,7 +158,7 @@ void setup()
   controlDelayMillis = 1000.0 / controlRate;
   
   if (!nh.getParam("ticks_meter", &ticksPerMeter)) {
-    ticksPerMeter = 50;
+    ticksPerMeter = 50; 
   }
   
   float vtargetTimeout;
@@ -179,17 +201,27 @@ void loop()
   int leftControl = leftController.getControlValue(lwheelRate, dt);
   leftMotorCmd += min(255, leftControl);
   leftMotorCmd = constrain(leftMotorCmd, -255, 255);
-  if (leftMotorCmd > 0) {
-    leftMotorCmd = max(leftMotorCmd, MIN_MOTOR_CMD);
+  
+  if (abs(leftMotorCmd) < MIN_MOTOR_CMD){  // avoid deadband
+      if (leftMotorCmd < 0){
+          leftMotorCmd = -MIN_MOTOR_CMD;
+      } else {
+          leftMotorCmd = MIN_MOTOR_CMD;
+      }
   }
   
   int rightControl = rightController.getControlValue(rwheelRate, dt);
   rightMotorCmd += min(255, rightControl);
   rightMotorCmd = constrain(rightMotorCmd, -255, 255);
-  if (rightMotorCmd > 0) {
-    rightMotorCmd = max(rightMotorCmd, MIN_MOTOR_CMD);
+  
+  if (abs(rightMotorCmd) < MIN_MOTOR_CMD){  // avoid deadband
+      if (rightMotorCmd < 0){
+          rightMotorCmd = -MIN_MOTOR_CMD;
+      } else {
+          rightMotorCmd = MIN_MOTOR_CMD;
+      }
   }
-
+  
   // Coast to a stop if target is zero.
   if (lwheelTargetRate == 0) {
     leftMotorCmd = 0;
@@ -247,7 +279,9 @@ void rightAChange() {
 void setSpeed(int leftSpeed, int rightSpeed) {
   digitalWrite(M1_DIRECTION, (leftSpeed >= 0 ? HIGH : LOW));
   analogWrite(M1_SPEED, abs(leftSpeed));
-  digitalWrite(M2_DIRECTION, (rightSpeed >= 0 ? HIGH : LOW));
+  //digitalWrite(M2_DIRECTION, (rightSpeed >= 0 ? HIGH : LOW));
+  // reversed sense because L, R motors wired identically
+  digitalWrite(M2_DIRECTION, (rightSpeed >= 0 ? LOW : HIGH));
   analogWrite(M2_SPEED, abs(rightSpeed));
 }
 
