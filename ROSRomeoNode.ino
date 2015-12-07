@@ -65,6 +65,11 @@ ros::Subscriber<std_msgs::Float32> lwheelTargetSub("lwheel_vtarget", &lwheelTarg
 void rwheelTargetCallback(const std_msgs::Float32& cmdMsg);
 ros::Subscriber<std_msgs::Float32> rwheelTargetSub("rwheel_vtarget", &rwheelTargetCallback);
 
+// add diagnostic message to find out what ticksPerMeter is being used
+// I suspect the parameter for this is not being grabbed from the launch file
+std_msgs::Int16 ticksPerMeterMsg;
+ros::Publisher ticksPerMeterPub("ticksPerMeter", &ticksPerMeterMsg);
+
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 // Ku and Tu were determined by setting Ki and Kd to zero, then increasing
@@ -142,6 +147,8 @@ void setup()
   nh.advertise(rwheelPub);
   nh.advertise(lwheelVelocityPub);
   nh.advertise(rwheelVelocityPub);
+  //
+  nh.advertise(ticksPerMeterPub);
 
   nh.subscribe(lwheelTargetSub);
   nh.subscribe(rwheelTargetSub);
@@ -158,9 +165,10 @@ void setup()
   controlDelayMillis = 1000.0 / controlRate;
   
   if (!nh.getParam("ticks_meter", &ticksPerMeter)) {
-    ticksPerMeter = 50; 
+    ticksPerMeter = 5113;  // was 50 but wasn't getting param from launch
   }
   
+    
   float vtargetTimeout;
   if (!nh.getParam("~vtarget_timeout", &vtargetTimeout)) {
     vtargetTimeout = 2.0;
@@ -183,6 +191,10 @@ void loop()
   long curRwheel = rwheel;
   interrupts();
 
+  // diagnostic
+  ticksPerMeterMsg.data = ticksPerMeter;
+  ticksPerMeterPub.publish(&ticksPerMeterMsg);
+  
   lwheelMsg.data = (int) curLwheel;
   rwheelMsg.data = (int) curRwheel;
   lwheelPub.publish(&lwheelMsg);
