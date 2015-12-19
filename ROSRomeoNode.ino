@@ -13,6 +13,11 @@
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
 
+// added this to use Pololu library
+#include <AStar32U4.h>
+
+AStar32U4Motors motors;
+
 // const int ONBOARD_LED_PIN = 13;
 
 // The pins for motor control on the Romeo BLE.
@@ -30,14 +35,16 @@
 // Pin definitions for A-star (PR version)
 const int ONBOARD_LED_PIN = 13;
 
-const int M1_DIRECTION = 12;
-const int M1_SPEED = 9;
-const int M2_SPEED = 10;
+//const int M1_DIRECTION = 12;
+//const int M1_SPEED = 9;
+//const int M2_SPEED = 10;
 //const int M2_DIRECTION = PE2;
+//const int M2_DIRECTION = HWB;
+//const int M2_DIRECTION = IO_E2;
 //
-// workaround for broken PE2 connection on my A-star
+// workaround for broken PE2 connection on my first A-star
 // this pin jumpered to PE2 trace
-const int M2_DIRECTION = 23;  
+// const int M2_DIRECTION = 23;  
 
 // Pins for the Pololu motor encoder outputs.
 const int M1_A = 0;
@@ -128,16 +135,20 @@ const int MIN_MOTOR_CMD = 0;  // was 60
 void setup()
 {
   pinMode(ONBOARD_LED_PIN, OUTPUT);
-  pinMode(M1_DIRECTION, OUTPUT);
-  pinMode(M2_DIRECTION, OUTPUT);
+  //pinMode(M1_DIRECTION, OUTPUT);
+  //pinMode(M2_DIRECTION, OUTPUT);
   
-  pinMode(M1_SPEED, OUTPUT);  // perhaps not needed?
-  pinMode(M2_SPEED, OUTPUT);
+  //pinMode(M1_SPEED, OUTPUT);  // perhaps not needed?
+  //pinMode(M2_SPEED, OUTPUT);
   pinMode(M1_A, INPUT);
   pinMode(M1_B, INPUT);
   pinMode(M2_A, INPUT);
   pinMode(M2_B, INPUT);
 
+  // Uncomment to flip a motor's direction:
+  motors.flipM1(true);
+  //motors.flipM2(true);
+  
   attachInterrupt(digitalPinToInterrupt(M1_A), leftAChange, CHANGE);
   attachInterrupt(digitalPinToInterrupt(M2_A), rightAChange, CHANGE);
 
@@ -288,6 +299,11 @@ void rightAChange() {
 }
 
 // Sets the left and right motor speeds.
+void setSpeed(int leftSpeed, int rightSpeed){
+    // wrap the Pololu function
+    motors.setSpeeds(leftSpeed, rightSpeed);
+}
+/*  replaced by Pololu library
 void setSpeed(int leftSpeed, int rightSpeed) {
   digitalWrite(M1_DIRECTION, (leftSpeed >= 0 ? HIGH : LOW));
   analogWrite(M1_SPEED, abs(leftSpeed));
@@ -296,4 +312,4 @@ void setSpeed(int leftSpeed, int rightSpeed) {
   digitalWrite(M2_DIRECTION, (rightSpeed >= 0 ? LOW : HIGH));
   analogWrite(M2_SPEED, abs(rightSpeed));
 }
-
+*/
