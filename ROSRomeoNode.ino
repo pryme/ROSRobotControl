@@ -9,9 +9,11 @@
 #include <SimplePID.h>
 
 #include <ros.h>
+#include <ros/time.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
+#include <sensor_msgs/LaserScan.h>
 
 // added this to use Pololu library
 #include <AStar32U4.h>
@@ -52,6 +54,12 @@ const int M1_B = 4;
 const int M2_A = 1;
 const int M2_B = 8;
 
+// Pins for the Sharp IR rangers
+const int IR_neg180 = A4;
+const int IR_neg45 = A5;
+const int IR_0 = A2;
+const int IR_pos45 = A3;
+
 ros::NodeHandle  nh;
 
 std_msgs::Int16 lwheelMsg;
@@ -65,6 +73,9 @@ ros::Publisher lwheelVelocityPub("lwheel_velocity", &lwheelVelocityMsg);
 
 std_msgs::Float32 rwheelVelocityMsg;
 ros::Publisher rwheelVelocityPub("rwheel_velocity", &rwheelVelocityMsg);
+
+sensor_msgs::LaserScan scan;
+ros::Publisher scan_pub("scan", &scan);
 
 void lwheelTargetCallback(const std_msgs::Float32& cmdMsg);
 ros::Subscriber<std_msgs::Float32> lwheelTargetSub("lwheel_vtarget", &lwheelTargetCallback);
@@ -132,6 +143,12 @@ int rightMotorCmd = 0;
 // Minimum motor control value. Motor output below this will stall.
 const int MIN_MOTOR_CMD = 0;  // was 60
 
+// IR range scan
+const int num_readings = 8;
+double laser_frequency = 50;
+double ranges[num_readings];
+double intensities[num_readings];
+
 void setup()
 {
   pinMode(ONBOARD_LED_PIN, OUTPUT);
@@ -144,6 +161,11 @@ void setup()
   pinMode(M1_B, INPUT);
   pinMode(M2_A, INPUT);
   pinMode(M2_B, INPUT);
+  
+  pinMode(IR_neg180, INPUT);
+  pinMode(IR_neg45, INPUT);
+  pinMode(IR_0, INPUT);
+  pinMode(IR_pos45, INPUT);
 
   // Uncomment to flip a motor's direction:
   motors.flipM1(true);
@@ -158,8 +180,9 @@ void setup()
   nh.advertise(rwheelPub);
   nh.advertise(lwheelVelocityPub);
   nh.advertise(rwheelVelocityPub);
+  nh.advertise(scan_pub);
   //
-  nh.advertise(ticksPerMeterPub);
+  nh.advertise(ticksPerMeterPub);  // what is this doing?  TODO:
 
   nh.subscribe(lwheelTargetSub);
   nh.subscribe(rwheelTargetSub);
@@ -182,7 +205,7 @@ void setup()
     
   float vtargetTimeout;
   if (!nh.getParam("~vtarget_timeout", &vtargetTimeout)) {
-    vtargetTimeout = 2.0;
+    vtargetTimeout = 0.2;
   }
   vtargetTimeoutMillis = vtargetTimeout * 1000;
 
@@ -204,7 +227,7 @@ void loop()
 
   // diagnostic
   ticksPerMeterMsg.data = ticksPerMeter;
-  ticksPerMeterPub.publish(&ticksPerMeterMsg);
+  ticksPerMeterPub.publish(&ticksPerMeterMsg);  // why is this here?  TODO:
   
   lwheelMsg.data = (int) curLwheel;
   rwheelMsg.data = (int) curRwheel;
@@ -265,9 +288,41 @@ void loop()
   lastLwheel = curLwheel;
   lastRwheel = curRwheel;
   
+  do_IR_scan();
+  
   lastLoopTime = curLoopTime;
   
   nh.spinOnce();
+}
+
+void do_IR_scan(){
+    //populate the LaserScan message
+    
+    //ros::Time scan_time = ros::Time::now();  // doesn't work; use nh.now()
+    //scan.header.stamp = scan_time;
+    scan.header.stamp = nh.now();
+    scan.header.frame_id = "base_link";
+    scan.angle_min = -3.14;
+    scan.angle_max = 3.14;
+    scan.angle_increment = 6.28 / num_readings;
+    scan.time_increment = (1 / laser_frequency) / (num_readings);
+    scan.range_min = 0.0;
+    scan.range_max = 2.0;
+    // TODO: ADC to distance conversion below is wrong, just quick estimate
+    scan.ranges[0] = 72.0 / max(10, analogRead(IR_neg180));
+    scan.ranges[3] = 72.0 / max(10, analogRead(IR_neg45));
+    scan.ranges[4] = 72.0 / max(10, analogRead(IR_0));
+    scan.ranges[5] = 72.0 / max(10, analogRead(IR_pos45));
+    scan.ranges[1] = 0.0;
+    scan.ranges[2] = 0.0;
+    scan.ranges[6] = 0.0;
+    scan.ranges[7] = 0.0;
+    // TODO: below is dummy - should elminate at least from loop
+    // maybe compiler optimizes :)
+    for(int i = 0; i < num_readings; ++i){
+        scan.intensities[i] = 0.0;
+    }
+    scan_pub.publish(&scan);
 }
 
 void lwheelTargetCallback(const std_msgs::Float32& cmdMsg) {
