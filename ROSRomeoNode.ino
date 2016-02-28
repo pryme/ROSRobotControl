@@ -13,7 +13,7 @@
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
-#include <sensor_msgs/LaserScan.h>
+//#include <sensor_msgs/LaserScan.h>
 
 // added this to use Pololu library
 #include <AStar32U4.h>
@@ -74,8 +74,20 @@ ros::Publisher lwheelVelocityPub("lwheel_velocity", &lwheelVelocityMsg);
 std_msgs::Float32 rwheelVelocityMsg;
 ros::Publisher rwheelVelocityPub("rwheel_velocity", &rwheelVelocityMsg);
 
-sensor_msgs::LaserScan scan;
-ros::Publisher scan_pub("scan", &scan);
+//sensor_msgs::LaserScan scan;
+//ros::Publisher scan_pub("scan", &scan);
+
+std_msgs::Int16 IR_neg180_msg;
+ros::Publisher IR_neg180_pub("IR_neg180", &IR_neg180_msg);
+
+std_msgs::Int16 IR_neg45_msg;
+ros::Publisher IR_neg45_pub("IR_neg45", &IR_neg45_msg);
+
+std_msgs::Int16 IR_0_msg;
+ros::Publisher IR_0_pub("IR_0", &IR_0_msg);
+
+std_msgs::Int16 IR_pos45_msg;
+ros::Publisher IR_pos45_pub("IR_pos45", &IR_pos45_msg);
 
 void lwheelTargetCallback(const std_msgs::Float32& cmdMsg);
 ros::Subscriber<std_msgs::Float32> lwheelTargetSub("lwheel_vtarget", &lwheelTargetCallback);
@@ -85,8 +97,8 @@ ros::Subscriber<std_msgs::Float32> rwheelTargetSub("rwheel_vtarget", &rwheelTarg
 
 // add diagnostic message to find out what ticksPerMeter is being used
 // I suspect the parameter for this is not being grabbed from the launch file
-std_msgs::Int16 ticksPerMeterMsg;
-ros::Publisher ticksPerMeterPub("ticksPerMeter", &ticksPerMeterMsg);
+//std_msgs::Int16 ticksPerMeterMsg;
+//ros::Publisher ticksPerMeterPub("ticksPerMeter", &ticksPerMeterMsg);
 
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
@@ -180,9 +192,13 @@ void setup()
   nh.advertise(rwheelPub);
   nh.advertise(lwheelVelocityPub);
   nh.advertise(rwheelVelocityPub);
-  nh.advertise(scan_pub);
+  //nh.advertise(scan_pub);
+  nh.advertise(IR_neg180_pub);
+  nh.advertise(IR_neg45_pub);
+  nh.advertise(IR_0_pub);
+  nh.advertise(IR_pos45_pub);
   //
-  nh.advertise(ticksPerMeterPub);  // what is this doing?  TODO:
+  //nh.advertise(ticksPerMeterPub);  // what is this doing?  TODO:
 
   nh.subscribe(lwheelTargetSub);
   nh.subscribe(rwheelTargetSub);
@@ -226,8 +242,8 @@ void loop()
   interrupts();
 
   // diagnostic
-  ticksPerMeterMsg.data = ticksPerMeter;
-  ticksPerMeterPub.publish(&ticksPerMeterMsg);  // why is this here?  TODO:
+  //ticksPerMeterMsg.data = ticksPerMeter;
+  //ticksPerMeterPub.publish(&ticksPerMeterMsg);  // why is this here?  TODO:
   
   lwheelMsg.data = (int) curLwheel;
   rwheelMsg.data = (int) curRwheel;
@@ -296,6 +312,7 @@ void loop()
 }
 
 void do_IR_scan(){
+    /*
     //populate the LaserScan message
     
     //ros::Time scan_time = ros::Time::now();  // doesn't work; use nh.now()
@@ -323,6 +340,19 @@ void do_IR_scan(){
         scan.intensities[i] = 0.0;
     }
     scan_pub.publish(&scan);
+    */
+    IR_neg180_msg.data = analogRead(IR_neg180);
+    IR_neg180_pub.publish(&IR_neg180_msg);
+    
+    IR_neg45_msg.data = analogRead(IR_neg45);
+    IR_neg45_pub.publish(&IR_neg45_msg);
+    
+    IR_0_msg.data = analogRead(IR_0);
+    IR_0_pub.publish(&IR_0_msg);
+    
+    IR_pos45_msg.data = analogRead(IR_pos45);
+    IR_pos45_pub.publish(&IR_pos45_msg);
+    
 }
 
 void lwheelTargetCallback(const std_msgs::Float32& cmdMsg) {
