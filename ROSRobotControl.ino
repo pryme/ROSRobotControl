@@ -4,7 +4,7 @@
 //
 
 // Needed on Leonardo to force use of USB serial.
-//#define USE_USBCON
+#define USE_USBCON
 
 #include <AStar32U4.h>
 #include <EnableInterrupt.h>
@@ -18,7 +18,7 @@
 const int ONBOARD_LED_PIN = 13;
 
 // Pins for the A-Star motor encoder outputs.
-const int M1_A = 7;
+const int M1_A = 8;  // changed to PCINT pin, leaving INT6 free
 const int M1_B = 11;
 const int M2_A = 15;
 const int M2_B = 16;
@@ -48,12 +48,12 @@ AStar32U4Motors motors;
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 
-const float Ku = .035;
+const float Ku = .035;  
 const float Tu = .235;
 
-const float Kp = 0.6*Ku;
-const float Ki = 2*Kp/Tu;
-const float Kd = Kp*Tu/8;
+const float Kp = 0.6*Ku;  // pr had 0.048 before
+const float Ki = 2*Kp/Tu;  // pr had 0.279 before
+const float Kd = Kp*Tu/8;  // pr had 0.00323 before
 
 SimplePID leftController = SimplePID(Kp, Ki, Kd);
 SimplePID rightController = SimplePID(Kp, Ki, Kd);
@@ -85,11 +85,15 @@ int leftMotorCmd = 0;
 int rightMotorCmd = 0;
 
 // Minimum motor control value. Motor output below this will stall.
-const int MIN_MOTOR_CMD = 60;
+const int MIN_MOTOR_CMD = 0;  // seems fine below 60
 
 void setup() {
   pinMode(ONBOARD_LED_PIN, OUTPUT);
 
+  // Uncomment to flip a motor's direction:
+  motors.flipM1(true);
+  //motors.flipM2(true);
+  
   enableInterrupt(M1_A, leftAChange, CHANGE);
   enableInterrupt(M1_B, leftBChange, CHANGE);
   enableInterrupt(M2_A, rightAChange, CHANGE);
@@ -160,17 +164,33 @@ void loop()
   int leftControl = leftController.getControlValue(lwheelRate, dt);
   leftMotorCmd += min(255, leftControl);
   leftMotorCmd = constrain(leftMotorCmd, -255, 255);
-  if (leftMotorCmd > 0) {
+  /* if (leftMotorCmd > 0) {
     leftMotorCmd = max(leftMotorCmd, MIN_MOTOR_CMD);
+  } */
+  if (abs(leftMotorCmd) < MIN_MOTOR_CMD){  // avoid deadband
+      if (leftMotorCmd < 0){
+          leftMotorCmd = -MIN_MOTOR_CMD;
+      } else {
+          leftMotorCmd = MIN_MOTOR_CMD;
+      }
   }
+  
   
   int rightControl = rightController.getControlValue(rwheelRate, dt);
   rightMotorCmd += min(255, rightControl);
   rightMotorCmd = constrain(rightMotorCmd, -255, 255);
-  if (rightMotorCmd > 0) {
+  /* if (rightMotorCmd > 0) {
     rightMotorCmd = max(rightMotorCmd, MIN_MOTOR_CMD);
   }
-
+  */
+  if (abs(rightMotorCmd) < MIN_MOTOR_CMD){  // avoid deadband
+       if (rightMotorCmd < 0){
+           rightMotorCmd = -MIN_MOTOR_CMD;
+       } else {
+           rightMotorCmd = MIN_MOTOR_CMD;
+       }
+  }
+ 
   // Coast to a stop if target is zero.
   if (lwheelTargetRate == 0) {
     leftMotorCmd = 0;
