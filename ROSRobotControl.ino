@@ -4,7 +4,8 @@
 //
 
 // Needed on Leonardo to force use of USB serial.
-#define USE_USBCON
+//#define USE_USBCON
+// commented to use hw serial between A* and RPi.
 
 #include <AStar32U4.h>
 #include <EnableInterrupt.h>
