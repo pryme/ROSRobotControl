@@ -1,15 +1,17 @@
-//
+//2016-3-12
 // ROSRomeoNode - Implements a ROS node for the RomeoBLE for controlling
 //     a ROSRev2-class robot.
 //
 
 // Needed on Leonardo to force use of USB serial.
-//#define USE_USBCON
+#define USE_USBCON
 // commented to use hw serial between A* and RPi.
 
 #include <AStar32U4.h>
 #include <EnableInterrupt.h>
 #include <SimplePID.h>
+// TODO trying this to avoid delay()
+#include <elapsedMillis.h>
 
 #include <ros.h>
 #include <std_msgs/Int16.h>
@@ -70,7 +72,9 @@ int lwheelTargetRate = 0;
 int rwheelTargetRate = 0;
 
 // The interval between motor control steps.
-int controlDelayMillis;
+// int controlDelayMillis;
+elapsedMillis waitMillis = 0;  // TODO trying with elapsedMillis to avoid delay()
+unsigned int controlDelayMillis;  // trying with elapsedMillis TODO 
 
 // The number of encoder ticks per meter.
 int ticksPerMeter;
@@ -96,12 +100,17 @@ void setup() {
   //motors.flipM2(true);
   
   enableInterrupt(M1_A, leftAChange, CHANGE);
-  enableInterrupt(M1_B, leftBChange, CHANGE);
+  // TODO commented out 'B' encoder edges for diagnostics
+  // enableInterrupt(M1_B, leftBChange, CHANGE);
   enableInterrupt(M2_A, rightAChange, CHANGE);
-  enableInterrupt(M2_B, rightBChange, CHANGE);
+  //enableInterrupt(M2_B, rightBChange, CHANGE);
 
   nh.initNode();
 
+  // TODO experimental to change serial baud rate
+  // reference: http://answers.ros.org/question/11022/rosserial_arduino-trouble-with-too-much-messaging/
+  nh.getHardware()->setBaud(115200);
+  
   nh.advertise(lwheelPub);
   nh.advertise(rwheelPub);
   nh.advertise(lwheelVelocityPub);
@@ -117,12 +126,12 @@ void setup() {
 
   int controlRate;
   if (!nh.getParam("~control_rate", &controlRate)) {
-    controlRate = 60;
+    controlRate = 60;  // TODO default = 10 only as diagnostic;  was 60
   }
   controlDelayMillis = 1000.0 / controlRate;
   
   if (!nh.getParam("ticks_meter", &ticksPerMeter)) {
-    ticksPerMeter = 11931;
+    ticksPerMeter = 5113;  // TODO was 10226
   }
   
   float vtargetTimeout;
@@ -138,8 +147,13 @@ void setup() {
 // Every loop, publish the encoder and wheel rates.
 void loop()
 {
-  delay(controlDelayMillis);
-
+  //delay(controlDelayMillis);
+  // TODO trying with elapsedMillis
+  while (waitMillis < controlDelayMillis){
+      ;  // do nothing
+  }
+  waitMillis = 0;  // reset
+  
   long curLoopTime = micros();
 
   noInterrupts();
@@ -230,7 +244,9 @@ void rwheelTargetCallback(const std_msgs::Float32& cmdMsg) {
 }
 
 void leftAChange() {
-  if (digitalRead(M1_A) == digitalRead(M1_B)) {
+  // TODO testing FastGPIO; clean up pin refs?; extend to B's?
+  //if (digitalRead(M1_A) == digitalRead(M1_B)) {
+    if (FastGPIO::Pin<8>::isInputHigh() == FastGPIO::Pin<11>::isInputHigh()){
     ++lwheel;
   } else {
     --lwheel;
@@ -246,7 +262,8 @@ void leftBChange() {
 }
 
 void rightAChange() {
-  if (digitalRead(M2_A) != digitalRead(M2_B)) {
+  //if (digitalRead(M2_A) != digitalRead(M2_B)) {
+    if (FastGPIO::Pin<15>::isInputHigh() != FastGPIO::Pin<16>::isInputHigh()){
     ++rwheel;
   } else {
     --rwheel;
