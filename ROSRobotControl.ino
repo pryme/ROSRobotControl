@@ -4,13 +4,13 @@
 //
 
 // Needed on Leonardo to force use of USB serial.
-#define USE_USBCON
+// #define USE_USBCON
 // commented to use hw serial between A* and RPi.
 
 #include <AStar32U4.h>
 #include <EnableInterrupt.h>
 #include <SimplePID.h>
-// TODO trying this to avoid delay()
+// using this to avoid delay() which is blocking
 #include <elapsedMillis.h>
 
 #include <ros.h>
@@ -51,8 +51,8 @@ AStar32U4Motors motors;
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 
-const float Ku = .035;  
-const float Tu = .235;
+const float Ku = .15;  // was 0.035
+const float Tu = .1142857143;  // was 0.235
 
 const float Kp = 0.6*Ku;  // pr had 0.048 before
 const float Ki = 2*Kp/Tu;  // pr had 0.279 before
@@ -73,8 +73,8 @@ int rwheelTargetRate = 0;
 
 // The interval between motor control steps.
 // int controlDelayMillis;
-elapsedMillis waitMillis = 0;  // TODO trying with elapsedMillis to avoid delay()
-unsigned int controlDelayMillis;  // trying with elapsedMillis TODO 
+elapsedMillis waitMillis = 0;  
+unsigned int controlDelayMillis;  // elapsedMillis is non-blocking
 
 // The number of encoder ticks per meter.
 int ticksPerMeter;
@@ -92,6 +92,9 @@ int rightMotorCmd = 0;
 // Minimum motor control value. Motor output below this will stall.
 const int MIN_MOTOR_CMD = 0;  // seems fine below 60
 
+// Maximum motor control value
+const int MAX_MOTOR_CMD = 400;
+
 void setup() {
   pinMode(ONBOARD_LED_PIN, OUTPUT);
 
@@ -100,16 +103,16 @@ void setup() {
   //motors.flipM2(true);
   
   enableInterrupt(M1_A, leftAChange, CHANGE);
-  // TODO commented out 'B' encoder edges for diagnostics
+  // not using 'B' encoder edges
   // enableInterrupt(M1_B, leftBChange, CHANGE);
   enableInterrupt(M2_A, rightAChange, CHANGE);
   //enableInterrupt(M2_B, rightBChange, CHANGE);
 
   nh.initNode();
 
-  // TODO experimental to change serial baud rate
+  // TODO experiment to change serial baud rate
   // reference: http://answers.ros.org/question/11022/rosserial_arduino-trouble-with-too-much-messaging/
-  nh.getHardware()->setBaud(115200);
+  // nh.getHardware()->setBaud(115200);
   
   nh.advertise(lwheelPub);
   nh.advertise(rwheelPub);
@@ -126,12 +129,12 @@ void setup() {
 
   int controlRate;
   if (!nh.getParam("~control_rate", &controlRate)) {
-    controlRate = 60;  // TODO default = 10 only as diagnostic;  was 60
+    controlRate = 60;  
   }
   controlDelayMillis = 1000.0 / controlRate;
   
   if (!nh.getParam("ticks_meter", &ticksPerMeter)) {
-    ticksPerMeter = 5113;  // TODO was 10226
+    ticksPerMeter = 5113;  // was 10226
   }
   
   float vtargetTimeout;
@@ -148,7 +151,7 @@ void setup() {
 void loop()
 {
   //delay(controlDelayMillis);
-  // TODO trying with elapsedMillis
+  // elapsedMillis is non-blocking
   while (waitMillis < controlDelayMillis){
       ;  // do nothing
   }
@@ -177,8 +180,8 @@ void loop()
   rwheelVelocityPub.publish(&rwheelVelocityMsg);
   
   int leftControl = leftController.getControlValue(lwheelRate, dt);
-  leftMotorCmd += min(255, leftControl);
-  leftMotorCmd = constrain(leftMotorCmd, -255, 255);
+  leftMotorCmd += min(MAX_MOTOR_CMD, leftControl);
+  leftMotorCmd = constrain(leftMotorCmd, -MAX_MOTOR_CMD, MAX_MOTOR_CMD);
   /* if (leftMotorCmd > 0) {
     leftMotorCmd = max(leftMotorCmd, MIN_MOTOR_CMD);
   } */
@@ -192,8 +195,8 @@ void loop()
   
   
   int rightControl = rightController.getControlValue(rwheelRate, dt);
-  rightMotorCmd += min(255, rightControl);
-  rightMotorCmd = constrain(rightMotorCmd, -255, 255);
+  rightMotorCmd += min(MAX_MOTOR_CMD, rightControl);
+  rightMotorCmd = constrain(rightMotorCmd, -MAX_MOTOR_CMD, MAX_MOTOR_CMD);
   /* if (rightMotorCmd > 0) {
     rightMotorCmd = max(rightMotorCmd, MIN_MOTOR_CMD);
   }
