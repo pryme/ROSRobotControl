@@ -51,12 +51,18 @@ AStar32U4Motors motors;
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
 //     https://en.wikipedia.org/wiki/PID_controller#Loop_tuning
 
-const float Ku = .15;  // was 0.035
-const float Tu = .1142857143;  // was 0.235
+//const float Ku = .15;  // was 0.035
+//const float Tu = .1142857143;  // was 0.235
 
-const float Kp = 0.6*Ku;  // pr had 0.048 before
-const float Ki = 2*Kp/Tu;  // pr had 0.279 before
-const float Kd = Kp*Tu/8;  // pr had 0.00323 before
+//const float Kp = 0.6*Ku;  // pr had 0.048 before
+///const float Ki = 2*Kp/Tu;  // pr had 0.279 before
+//const float Kd = Kp*Tu/8;  // pr had 0.00323 before
+//const float Kp = 0.048;  // TODO
+//const float Ki = 0.279;  // TODO
+//const float Kd = 0.00323;  // TODO
+const float Kp = 0.15;  // from pr re-tuning Z-N based on Ku = 0.25
+const float Ki = 2.625;
+const float Kd = 0.002143;
 
 SimplePID leftController = SimplePID(Kp, Ki, Kd);
 SimplePID rightController = SimplePID(Kp, Ki, Kd);
