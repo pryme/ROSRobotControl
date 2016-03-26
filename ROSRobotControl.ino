@@ -77,6 +77,11 @@ long lastRwheel = 0;
 int lwheelTargetRate = 0;
 int rwheelTargetRate = 0;
 
+// Current motor setpoints in ticks / sec; allows setpoint ramping
+int lwheelCurrentSetpoint = 0;
+int rwheelCurrentSetpoint = 0;
+float maxSetpointSpeedStep = 0.02;  // abs(max step in setpoint); m/sec
+
 // The interval between motor control steps.
 // int controlDelayMillis;
 elapsedMillis waitMillis = 0;  
@@ -228,8 +233,44 @@ void loop()
   // Turn off motors if too much time has elapsed since last motor command.
   if (millis() - lastMotorCmdTime > vtargetTimeoutMillis) {
     lwheelTargetRate = 0;
+    lwheelCurrentSetpoint = 0;
     rwheelTargetRate = 0;
-    setSpeed(0, 0);
+    rwheelCurrentSetpoint = 0;
+    // setSpeed(0 , 0); // TODO temp for test
+    
+    while((leftMotorCmd != 0) || (rightMotorCmd != 0)) {
+        // ramp down motors to limit deceleration
+        if (abs(leftMotorCmd) < 40) {
+            leftMotorCmd = 0;
+        }
+        if (leftMotorCmd < 0) {
+            leftMotorCmd += 20;
+            if (leftMotorCmd >= 0) {
+                leftMotorCmd = 0;  // don't pass zero
+            }
+        } else {
+            leftMotorCmd -= 20;
+            if (leftMotorCmd <= 0) {
+                leftMotorCmd = 0;  // don't pass zero
+            }
+        }
+        if (abs(rightMotorCmd) < 40) {
+            rightMotorCmd = 0;
+        }
+        if (rightMotorCmd < 0) {
+            rightMotorCmd += 20;
+            if (rightMotorCmd >= 0) {
+                rightMotorCmd = 0;  // don't pass zero
+            }
+        } else {
+            rightMotorCmd -= 20;
+            if (rightMotorCmd <= 0) {
+                rightMotorCmd = 0;  // don't pass zero
+            }
+        }    
+        setSpeed(leftMotorCmd, rightMotorCmd);
+        delayMicroseconds(4000);  // control loop speed;  TODO 16000 max
+    }  // end while
   }
 
   lastLwheel = curLwheel;
@@ -243,13 +284,48 @@ void loop()
 void lwheelTargetCallback(const std_msgs::Float32& cmdMsg) {
   lastMotorCmdTime = millis();
   lwheelTargetRate = cmdMsg.data * ticksPerMeter;
-  leftController.setSetPoint(lwheelTargetRate);
+  // ramp the setpoint to control acceleration
+  // TODO: do ramp here
+  int spDelta = lwheelCurrentSetpoint - lwheelTargetRate;
+  if (spDelta == 0) {
+      return;  // already at the target setpoint
+  }
+  if (spDelta < 0) {
+      lwheelCurrentSetpoint += (int)(maxSetpointSpeedStep * ticksPerMeter);
+      if (lwheelCurrentSetpoint >= lwheelTargetRate) {
+          lwheelCurrentSetpoint = lwheelTargetRate;  // constrain max
+      }
+  } else {
+      lwheelCurrentSetpoint -= (int)(maxSetpointSpeedStep * ticksPerMeter);
+      if (lwheelCurrentSetpoint <= lwheelTargetRate) {
+          lwheelCurrentSetpoint = lwheelTargetRate;  // constrain min
+      }
+  }
+  // leftController.setSetPoint(lwheelTargetRate);
+  leftController.setSetPoint(lwheelCurrentSetpoint);
 }
 
 void rwheelTargetCallback(const std_msgs::Float32& cmdMsg) {
   lastMotorCmdTime = millis();
   rwheelTargetRate = cmdMsg.data * ticksPerMeter;
-  rightController.setSetPoint(rwheelTargetRate);
+  // ramp the setpoint to control acceleration
+  int spDelta = rwheelCurrentSetpoint - rwheelTargetRate;
+  if (spDelta == 0) {
+      return;  // already at the target setpoint
+  }
+  if (spDelta < 0) {
+      rwheelCurrentSetpoint += (int)(maxSetpointSpeedStep * ticksPerMeter);
+      if (rwheelCurrentSetpoint >= rwheelTargetRate) {
+          rwheelCurrentSetpoint = rwheelTargetRate;  // constrain max
+      }
+  } else {
+      rwheelCurrentSetpoint -= (int)(maxSetpointSpeedStep * ticksPerMeter);
+      if (rwheelCurrentSetpoint <= rwheelTargetRate) {
+          rwheelCurrentSetpoint = rwheelTargetRate;  // constrain min
+      }
+  }
+  //rightController.setSetPoint(rwheelTargetRate);
+  rightController.setSetPoint(rwheelCurrentSetpoint);
 }
 
 void leftAChange() {
