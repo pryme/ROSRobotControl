@@ -46,6 +46,9 @@ ros::Subscriber<std_msgs::Float32> lwheelTargetSub("lwheel_vtarget", &lwheelTarg
 void rwheelTargetCallback(const std_msgs::Float32& cmdMsg);
 ros::Subscriber<std_msgs::Float32> rwheelTargetSub("rwheel_vtarget", &rwheelTargetCallback);
 
+std_msgs::Int16 controlDelayMsg;  // TODO diagnostic
+ros::Publisher cDelayPub("cDelay", &controlDelayMsg);
+
 AStar32U4Motors motors;
 
 // Ziegler-Nichols tuning. See this Wikipedia article for details:
@@ -129,6 +132,7 @@ void setup() {
   nh.advertise(rwheelPub);
   nh.advertise(lwheelVelocityPub);
   nh.advertise(rwheelVelocityPub);
+  nh.advertise(cDelayPub);
 
   nh.subscribe(lwheelTargetSub);
   nh.subscribe(rwheelTargetSub);
@@ -156,11 +160,14 @@ void setup() {
 
   lastLoopTime = micros();
   lastMotorCmdTime = lastLoopTime;
+  
+  controlDelayMsg.data = (int) controlDelayMillis;
 }
 
 // Every loop, publish the encoder and wheel rates.
 void loop()
 {
+  cDelayPub.publish(&controlDelayMsg);  // TODO diagnostic
   //delay(controlDelayMillis);
   // elapsedMillis is non-blocking
   while (waitMillis < controlDelayMillis){
@@ -236,11 +243,12 @@ void loop()
     lwheelCurrentSetpoint = 0;
     rwheelTargetRate = 0;
     rwheelCurrentSetpoint = 0;
+    const int stopDeadband = 20;  // if MotorCmd < this make it zero
     // setSpeed(0 , 0); // TODO temp for test
     
     while((leftMotorCmd != 0) || (rightMotorCmd != 0)) {
         // ramp down motors to limit deceleration
-        if (abs(leftMotorCmd) < 40) {
+        if (abs(leftMotorCmd) < stopDeadband) {
             leftMotorCmd = 0;
         }
         if (leftMotorCmd < 0) {
@@ -254,7 +262,7 @@ void loop()
                 leftMotorCmd = 0;  // don't pass zero
             }
         }
-        if (abs(rightMotorCmd) < 40) {
+        if (abs(rightMotorCmd) < stopDeadband) {
             rightMotorCmd = 0;
         }
         if (rightMotorCmd < 0) {
@@ -269,7 +277,7 @@ void loop()
             }
         }    
         setSpeed(leftMotorCmd, rightMotorCmd);
-        delayMicroseconds(4000);  // control loop speed;  TODO 16000 max
+        delayMicroseconds(8);  // control loop speed;
     }  // end while
   }
 
